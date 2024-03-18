@@ -1,28 +1,36 @@
-// SPDX-License-Identifier: MIT
+//SPDX-License-Identifier: MIT
 pragma solidity 0.8.20;
 
-import "./ERC404.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/Strings.sol";
+import "./ERC404.sol"; // Ensure this path is correct
 
-contract Unfound is ERC404 {
+contract Unfound is Ownable, ERC404 {
+    uint256 private constant MAX_TOTAL_SUPPLY_ERC721 = 8;
+    uint256 public constant FRACTIONS_PER_TOKEN = 1e18; // Assuming 18 decimal places for the ERC20 part
     using Strings for uint256;
 
-    string public dataURI;
-
-    constructor(address _owner) ERC404("Demo", "DEMO", 18, 8, _owner) {
-        balanceOf[_owner] = 8 * 10 ** 18;
+    constructor(
+        string memory name_,
+        string memory symbol_,
+        uint8 decimals_
+    ) ERC404(name_, symbol_, decimals_) Ownable(msg.sender) {
+        // Do not mint the ERC721s to the initial owner, as it's a waste of gas.
+        _setERC721TransferExempt(msg.sender, true);
+        
+        // Mint ERC20 tokens to the initial owner based on the ERC-721 max supply
+        _mintERC20(msg.sender, MAX_TOTAL_SUPPLY_ERC721 * FRACTIONS_PER_TOKEN);
     }
 
-    function setDataURI(string memory _dataURI) public onlyOwner {
-        dataURI = _dataURI; 
+    // Override the tokenURI function to ensure it uses the simplified ID system
+    function tokenURI(uint256 $id) public pure override returns (string memory) {
+        // Construct the URI based on the simplified ID
+        uint256 tokenId = $id - (1 << 255);
+        string memory baseURI = "https://raw.githubusercontent.com/UnfoundLabs/assets/main/metadata/";
+        return string.concat(baseURI, tokenId.toString(), ".json");
     }
 
-    function setNameSymbol(string memory _name, string memory _symbol) public onlyOwner {
-        _setNameSymbol(_name, _symbol);
+    function setERC721TransferExempt(address account_, bool value_) external onlyOwner {
+        _setERC721TransferExempt(account_, value_);
     }
-
-    function tokenURI(uint256 id) public view override returns (string memory) {
-        return string(abi.encodePacked(dataURI, Strings.toString(id), ".json"));
-    }
-
 }

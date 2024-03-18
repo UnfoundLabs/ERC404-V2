@@ -8,37 +8,49 @@ const {
   readABI,
 } = require('../utils/io');
 
-// deploy the new contract
-task('deploy:Unfound', 'Deploy Contract', async (_, { ethers }) => {
-  const accounts = await ethers.getSigners();
-  const signer = accounts[0];
 
-  const myContract = await ethers.deployContract(CONTRACT_NAMES.Unfound, [
-    // owner address
-    signer.address,
-  ]);
+task('deploy:Unfound', 'Deploy the Unfound Contract')
+  .addParam("name", "The token name")
+  .addParam("symbol", "The token symbol")
+  .addParam("decimals", "The number of decimals")
+  .setAction(async (taskArgs, { ethers }) => {
+    const accounts = await ethers.getSigners();
+    const signer = accounts[0];
 
-  await myContract.waitForDeployment();
+    const UnfoundContract = await ethers.deployContract(CONTRACT_NAMES.Unfound, [
+      taskArgs.name,
+      taskArgs.symbol,
+      taskArgs.decimals
+    ]);
 
-  console.info(`Contract deployed at ${myContract.target}`);
 
-  writeContract(CONTRACT_NAMES.Unfound, myContract.target, signer.address, []);
+    await UnfoundContract.waitForDeployment();
+
+    console.info(`Contract deployed at ${UnfoundContract.target}`);
+  
+    writeContract(CONTRACT_NAMES.Unfound, UnfoundContract.target, signer.address, []);
+
 });
 
 // verify contract on etherscan
 task('verify:Unfound', 'Verify Contract', async (_, { run }) => {
   const myContract = readContract(CONTRACT_NAMES.Unfound);
-  const accounts = await ethers.getSigners();
-  const signer = accounts[0];
+
+  // Assuming these were your deployment parameters
+  const name = "Devchef";
+  const symbol = "DEV";
+  const decimals = 18; // Assuming decimals were provided as a number, not a string
 
   await run('verify:verify', {
     address: myContract.address,
     constructorArguments: [
-      // owner address
-      signer.address,
+      name,
+      symbol,
+      decimals,
     ],
   });
 });
+
 
 // whitelist deployer address
 task(
@@ -65,7 +77,7 @@ task(
   'whitelist-address:Unfound',
   'Whitelists a specific address for the Contract',
   async (taskArgs, { ethers }) => {
-    const { addressToWhitelist } = taskArgs; // Assuming the address to whitelist is passed as a task argument
+    const { whitelist } = taskArgs; // Assuming the address to whitelist is passed as a task argument
 
 
     const myContract = readContract(CONTRACT_NAMES.Unfound);
@@ -76,12 +88,12 @@ task(
 
     const contract = new ethers.Contract(myContract.address, abi, signer);
 
-    const tx = await contract.setWhitelist(addressToWhitelist, true);
+    const tx = await contract.setWhitelist(whitelist, true);
     await tx.wait();
 
-    console.info(`${addressToWhitelist} whitelisted`);
+    console.info(`${whitelist} whitelisted`);
   },
-).addParam("addressToWhitelist", "The address to be whitelisted");
+).addParam("whitelist", "The address to be whitelisted");
 
 
 // set data-uri 
@@ -110,3 +122,33 @@ task(
 task('abi:Unfound', 'Export contract ABI', async () => {
   writeABI('unfound.sol/Unfound.json', CONTRACT_NAMES.Unfound);
 });
+
+task("create-pool:Unfound", "Creates a new staking pool", async (taskArgs, { ethers }) => {
+  const { tokenaddress, amount } = taskArgs;
+
+  const myContract = readContract(CONTRACT_NAMES.Unfound);
+  const abi = readABI(CONTRACT_NAMES.Unfound);
+  console.log(abi)
+
+  const accounts = await ethers.getSigners();
+  const signer = accounts[0];
+  const contract = new ethers.Contract(myContract.address, abi, signer);
+
+  try {
+      // Specify the gas limit explicitly if required
+      const gasLimit = 1000000; // Example gas limit, adjust based on needs
+      const tx = await contract.createPool(tokenaddress, ethers.parseUnits(amount, 18), {
+          gasLimit: gasLimit,
+      });
+      await tx.wait();
+      console.info(`Pool created with ${tokenaddress} for amount: ${amount}`);
+  } catch (error) {
+      console.error("Failed to create pool:", error);
+      // Additional debug information
+      console.debug(`Token Address: ${tokenaddress}`);
+      console.debug(`Amount: ${amount}`);
+      console.debug(`Signer Address: ${await signer.getAddress()}`);
+  }
+})
+.addParam("tokenaddress", "The address of the token contract")
+.addParam("amount", "The amount of tokens to stake");

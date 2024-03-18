@@ -8,7 +8,7 @@ const {
   readABI,
 } = require('../utils/io');
 
-
+// task to deploy contract passing parameters
 task('deploy:Unfound', 'Deploy the Unfound Contract')
   .addParam("name", "The token name")
   .addParam("symbol", "The token symbol")
@@ -32,7 +32,7 @@ task('deploy:Unfound', 'Deploy the Unfound Contract')
 
 });
 
-// verify contract on etherscan
+// verify contract on etherscan, kae sure to match the token details
 task('verify:Unfound', 'Verify Contract', async (_, { run }) => {
   const myContract = readContract(CONTRACT_NAMES.Unfound);
 
@@ -51,104 +51,7 @@ task('verify:Unfound', 'Verify Contract', async (_, { run }) => {
   });
 });
 
-
-// whitelist deployer address
-task(
-  'whitelist-owner:Unfound',
-  'Whitelists the owner of the Contract',
-  async (_, { ethers }) => {
-    const myContract = readContract(CONTRACT_NAMES.Unfound);
-    const abi = readABI(CONTRACT_NAMES.Unfound);
-
-    const accounts = await ethers.getSigners();
-    const signer = accounts[0];
-
-    const contract = new ethers.Contract(myContract.address, abi, signer);
-
-    const tx = await contract.setWhitelist(signer.address, true);
-    await tx.wait();
-
-    console.info(`${signer.address} whitelisted`);
-  },
-);
-
-// whitelist user / uniswap address manually
-task(
-  'whitelist-address:Unfound',
-  'Whitelists a specific address for the Contract',
-  async (taskArgs, { ethers }) => {
-    const { whitelist } = taskArgs; // Assuming the address to whitelist is passed as a task argument
-
-
-    const myContract = readContract(CONTRACT_NAMES.Unfound);
-    const abi = readABI(CONTRACT_NAMES.Unfound);
-
-    const accounts = await ethers.getSigners();
-    const signer = accounts[0];
-
-    const contract = new ethers.Contract(myContract.address, abi, signer);
-
-    const tx = await contract.setWhitelist(whitelist, true);
-    await tx.wait();
-
-    console.info(`${whitelist} whitelisted`);
-  },
-).addParam("whitelist", "The address to be whitelisted");
-
-
-// set data-uri 
-task(
-  'set-data-uri',
-  'Sets the DataURI in the contract',
-  async (_, { ethers }) => {
-    const myContract = readContract(CONTRACT_NAMES.Unfound);
-    const abi = readABI(CONTRACT_NAMES.Unfound);
-
-    const accounts = await ethers.getSigners();
-    const signer = accounts[0];
-
-    const contract = new ethers.Contract(myContract.address, abi, signer);
-
-    const dataURI = process.env.IMAGE_URL;
-
-    const tx = await contract.setDataURI(dataURI);
-    await tx.wait();
-
-    console.info(`DataURI has been set successfully!`);
-  },
-);
-
 // Export the ABI for use
 task('abi:Unfound', 'Export contract ABI', async () => {
   writeABI('unfound.sol/Unfound.json', CONTRACT_NAMES.Unfound);
 });
-
-task("create-pool:Unfound", "Creates a new staking pool", async (taskArgs, { ethers }) => {
-  const { tokenaddress, amount } = taskArgs;
-
-  const myContract = readContract(CONTRACT_NAMES.Unfound);
-  const abi = readABI(CONTRACT_NAMES.Unfound);
-  console.log(abi)
-
-  const accounts = await ethers.getSigners();
-  const signer = accounts[0];
-  const contract = new ethers.Contract(myContract.address, abi, signer);
-
-  try {
-      // Specify the gas limit explicitly if required
-      const gasLimit = 1000000; // Example gas limit, adjust based on needs
-      const tx = await contract.createPool(tokenaddress, ethers.parseUnits(amount, 18), {
-          gasLimit: gasLimit,
-      });
-      await tx.wait();
-      console.info(`Pool created with ${tokenaddress} for amount: ${amount}`);
-  } catch (error) {
-      console.error("Failed to create pool:", error);
-      // Additional debug information
-      console.debug(`Token Address: ${tokenaddress}`);
-      console.debug(`Amount: ${amount}`);
-      console.debug(`Signer Address: ${await signer.getAddress()}`);
-  }
-})
-.addParam("tokenaddress", "The address of the token contract")
-.addParam("amount", "The amount of tokens to stake");
